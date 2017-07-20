@@ -3,6 +3,9 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 
+#include <QtWebSockets/QWebSocket>
+#include <QUrl>
+#include <QtCore/QObject>
 /**
  * Actually just an object intended to be moved to a thread
  */

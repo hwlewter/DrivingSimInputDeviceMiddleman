@@ -19,6 +19,12 @@ DeviceTester::DeviceTester(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    QPushButton* sendButton = ui->sendButton;
+    webSocketServer = new QWebSocketServer(QStringLiteral("WebServer"),
+                               QWebSocketServer::NonSecureMode,
+                               this);
+    connect(sendButton, &QPushButton::clicked, this, &DeviceTester::sendJSONPacket);
+
     // initialize fault modifiers
     steeringEffectiveness = 1.0;
     brakeEffectiveness = 1.0;
@@ -38,7 +44,11 @@ DeviceTester::DeviceTester(QWidget *parent) :
     connect(ui->verticalSliderBrake, &QSlider::valueChanged, this, &DeviceTester::brakeEffectivenessUpdate);
     connect(ui->verticalSliderSteer, &QSlider::valueChanged, this, &DeviceTester::steeringEffectivenessUpdate);
     connect(ui->dialDelay, &QDial::valueChanged, this, &DeviceTester::delayUpdate);
-
+    if(webSocketServer->listen(QHostAddress::Any, 4712))
+    {
+        ui->textBrowser->append("Web Socket Server listening on port 4712");
+        connect(webSocketServer, &QWebSocketServer::newConnection, this, &DeviceTester::onNewConnection);
+    }
     ui->inputDelayLabel->setText("0.0 sec");
 }
 
@@ -175,15 +185,36 @@ void DeviceTester::socketProvided(){  // when told a socket was made
 
 void DeviceTester::sendJSONPacket()
 {
+    //Set Thrustmaster values
     double steerValue = ui->lineEditWheelDec->text().toDouble();
     double steerValueConverted = (steerValue-32767)/21844;
     double throttleValue = ui -> lineEditGas->text().toDouble();
     double throttleValueConverted = (1023-throttleValue)/1023;
-    QString JSONstr = "{ 'steering_angle': "+ QString::number(steerValueConverted,'f',8)+ ", 'throttle': }" + QString::number(throttleValueConverted,'f',8) + "}";
-    ui->textBrowser->append(JSONstr);
-    QByteArray JSONpacket;
-    JSONpacket.append(JSONstr);
-    packetSender(JSONpacket);
+    ui->textBrowser->append("Message attempt to send.");
+    if(client != nullptr)//.pro->QMAKE_CXXFLAGS += -std=c++0x
+    {
+        //Set user input values to test car funtionality before using Thrustmaster
+        double steerAngle = ui->lineEditWheelDec->text().toDouble();
+        double gas = ui->lineEditGas->text().toDouble();
+
+        //Create Json Dictionaries
+        QJsonObject eventData;
+        eventData.insert("steering_angle", QJsonValue::fromVariant(steerAngle));
+        eventData.insert("throttle", QJsonValue::fromVariant(gas));
+
+        QJsonObject event;
+        event.insert("name", "steer");
+        event.insert("data", eventData);
+
+        QJsonDocument doc(event);//Send name
+        client->sendTextMessage("42" + doc.toJson(QJsonDocument::Compact));//Send data
+    }
+}
+
+void DeviceTester::onNewConnection()
+{
+    ui->textBrowser->append("Client connected.");
+    client = webSocketServer->nextPendingConnection();
 }
 
 void DeviceTester::showMessageFromThread(QString message){
