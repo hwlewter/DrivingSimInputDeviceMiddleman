@@ -201,13 +201,21 @@ void DeviceTester::sendJSONPacket()
         QJsonObject eventData;
         eventData.insert("steering_angle", QJsonValue::fromVariant(steerAngle));
         eventData.insert("throttle", QJsonValue::fromVariant(gas));
+        //eventData.insert("");
 
+        QJsonObject data;
+        //event.insert("name", "steer");
+        data.insert("data", eventData);
         QJsonObject event;
         event.insert("name", "steer");
-        event.insert("data", eventData);
 
-        QJsonDocument doc(event);//Send name
-        client->sendTextMessage("42" + doc.toJson(QJsonDocument::Compact));//Send data
+        QJsonDocument doc(data);//Send name
+        QJsonDocument doc2(event);
+        //client->sendTextMessage("42" + doc.toJson(QJsonDocument::Compact));//Send data
+        //client->sendTextMessage("42{\"data\":{\"steering_angle\":0,\"throttle\":0},\"name\":\"steer\"}");
+        client->sendTextMessage("42" + doc2.toJson(QJsonDocument::Compact) + doc.toJson(QJsonDocument::Compact));
+        //client->sendTextMessage("42" + event);//Send data
+
     }
 }
 
