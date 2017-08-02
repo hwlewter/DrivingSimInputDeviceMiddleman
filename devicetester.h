@@ -78,6 +78,8 @@ private slots:
     void sendCanbusPacketBrake();
     void sendCanbusPacketClutch();
     void sendDPadPacket();
+    void sendGearPacket();
+    void sendWheelButtonsPacket();
     void steeringEffectivenessUpdate();
     void brakeEffectivenessUpdate();
     void packetSender(QByteArray packet);

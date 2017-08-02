@@ -7,8 +7,13 @@ TCPServerThread::TCPServerThread()
 
 TCPServerThread::~TCPServerThread(){
     if (socketMade) tcpServer->close();  //should clean up any sockets created from this server too
+}
+
+void TCPServerThread::startOver(){
+    socketMade =  false;
 
 }
+
 
 void TCPServerThread::startUp(){  // runs when the object is created and moved to a new thread
     emit postMessage("Thread Started");
@@ -20,14 +25,15 @@ void TCPServerThread::startUp(){  // runs when the object is created and moved t
     //QWebSocket webSocket;
    // QUrl url("ws://127.0.0.1:4712/socket.io/?EIO=4&transport=websocket");
     //QWebSocket webSocket;
-    QString currentIP = "127.0.0.1";  // 146.229.161.0 is address of carsim desktop
+   //QString currentIP = "127.0.0.1";  // 146.229.161.0 is address of carsim desktop
+    currentIP = "146.229.161.0";
     //connect(&m_webSocket, &QWebSocket::connected, this, &EchoClient::onConnected);
     //connect(&m_webSocket, &QWebSocket::disconnected, this, &EchoClient::closed);
    // connect(&webSocket, &QWebSocket::connected, this, &TCPServerThread::processNewConnection);
     //connect(&webSocket, &QWebSocket::disconnected, this, &TCPServerThread::closed);
     //webSocket.open(QUrl(url));
     //
-    QHostAddress hostAddress;
+    //QHostAddress hostAddress;
     hostAddress.setAddress(currentIP);
     tcpServer->listen(hostAddress, 4712);
     //emit postMessage("Server Address listening is : " + url.toString());
