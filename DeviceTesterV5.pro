@@ -8,7 +8,7 @@ QT       += core gui network websockets
 QMAKE_CXXFLAGS += -std=c++0x
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-TARGET = DeviceTesterV4
+TARGET = DeviceTesterV5
 TEMPLATE = app
 
 # The following define makes your compiler emit warnings if you use

@@ -3,6 +3,9 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 
+#include <QtWebSockets/QWebSocket>
+#include <QUrl>
+#include <QtCore/QObject>
 /**
  * Actually just an object intended to be moved to a thread
  */
@@ -18,6 +21,9 @@ public:
     QTcpSocket *tcpSocket;  // socket for openDS
     QTcpSocket *tcpSocket2; // socket for remote app
     bool socketMade;  // first socket for openDS
+    QString currentIP;
+    QHostAddress hostAddress;
+    void startOver();
 
 signals:
     void newConnection();  // to tell GUI a socket is ready for use

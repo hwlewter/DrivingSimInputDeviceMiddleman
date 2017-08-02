@@ -19,6 +19,9 @@ DeviceTester::DeviceTester(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    //QPushButton* sendButton = ui->sendButton;
+
+
     // initialize fault modifiers
     steeringEffectiveness = 1.0;
     brakeEffectiveness = 1.0;
@@ -118,7 +121,12 @@ void DeviceTester::createHostSocket(){
         ui->textBrowser->append("Host Socket for OpenDS To be created");
         if (socketMade){
             //tcpSocket->close();
-            thread->deleteLater();
+            //serverThread->~TCPServerThread();
+            //tcpServer->close();
+            //thread->quit();
+            //thread->deleteLater();
+            serverThread->startOver();
+            return;
         }
 
         socketMade = true;  // now meaning the thread for the socket server was started
@@ -133,20 +141,31 @@ void DeviceTester::createHostSocket(){
     }
     else if (ui->radioButtonUdacity->isChecked()){
         //ui->textBrowser->append("Udacity support not finished yet");
-        ui->textBrowser->append("Host Socket for Unity to be created");
-        if (socketMade){
+        ui->textBrowser->append("Web Socket for Unity to be created");
+   //     if (socketMade){
             //tcpSocket->close();
-            thread->deleteLater();
-        }
+   //         thread->deleteLater();
+   //     }
 
-        socketMade = true;  // now meaning the thread for the socket server was started
-        thread = new QThread;
-        serverThread = new TCPServerThread();
-        serverThread->moveToThread(thread);
-        connect(serverThread, SIGNAL(postMessage(QString)), this, SLOT(showMessageFromThread(QString)));
-        connect(thread, SIGNAL(started()), serverThread, SLOT(startUp()));  // once thread is started, begin server process
-        connect(serverThread, SIGNAL(newConnection()), this, SLOT(socketProvided()));
-        thread->start();
+     //   socketMade = true;  // now meaning the thread for the socket server was started
+     //   thread = new QThread;
+     //   serverThread = new TCPServerThread();
+     //   serverThread->moveToThread(thread);
+        webSocketServer = new QWebSocketServer(QStringLiteral("WebServer"),
+                                   QWebSocketServer::NonSecureMode,
+                                   this);
+        if(webSocketServer->listen(QHostAddress::Any, 4712))
+        {
+            ui->textBrowser->append("Web Socket Server listening on port 4712");
+            connect(webSocketServer, &QWebSocketServer::newConnection, this, &DeviceTester::onNewConnection);
+        }
+        //connect(ui->sendButton, &QPushButton::clicked, this, &DeviceTester::sendJSONPacket);
+        connect(ui->lineEditWheelDec,&QLineEdit::textChanged, this, &DeviceTester::sendJSONPacket);
+        connect(ui->lineEditGas,&QLineEdit::textChanged, this, &DeviceTester::sendJSONPacket);
+       // connect(serverThread, SIGNAL(postMessage(QString)), this, SLOT(showMessageFromThread(QString)));
+       // connect(thread, SIGNAL(started()), serverThread, SLOT(startUp()));  // once thread is started, begin server process
+       // connect(serverThread, SIGNAL(newConnection()), this, SLOT(socketProvided()));
+      //  thread->start();
         ui->textBrowser->append("Thread should have started...");
     }
 }
@@ -160,6 +179,8 @@ void DeviceTester::socketProvided(){  // when told a socket was made
         connect(ui->lineEditBrake, &QLineEdit::textChanged, this, &DeviceTester::sendCanbusPacketBrake);
         connect(ui->lineEditClutch, &QLineEdit::textChanged, this, &DeviceTester::sendCanbusPacketClutch);
         connect(ui->lineEditWheelByte15, &QLineEdit::textChanged, this, &DeviceTester::sendDPadPacket);
+        connect(ui->lineEditShiftByte2, &QLineEdit::textChanged, this, &DeviceTester::sendGearPacket);
+        connect(ui->lineEditWheelByte12, &QLineEdit::textChanged, this, &DeviceTester::sendWheelButtonsPacket);
 
         // for remote app socket
         connect(serverThread, SIGNAL(remoteFaultMessage(QString)), this, SLOT(updateFaults(QString)));
@@ -175,20 +196,126 @@ void DeviceTester::socketProvided(){  // when told a socket was made
 
 void DeviceTester::sendJSONPacket()
 {
+    //Set Thrustmaster values
     double steerValue = ui->lineEditWheelDec->text().toDouble();
     double steerValueConverted = (steerValue-32767)/21844;
     double throttleValue = ui -> lineEditGas->text().toDouble();
     double throttleValueConverted = (1023-throttleValue)/1023;
-    QString JSONstr = "{ 'steering_angle': "+ QString::number(steerValueConverted,'f',8)+ ", 'throttle': }" + QString::number(throttleValueConverted,'f',8) + "}";
-    ui->textBrowser->append(JSONstr);
-    QByteArray JSONpacket;
-    JSONpacket.append(JSONstr);
-    packetSender(JSONpacket);
+    ui->textBrowser->append("Message attempt to send.");
+    if(client != nullptr)//.pro->QMAKE_CXXFLAGS += -std=c++0x
+    {
+        //Set user input values to test car funtionality before using Thrustmaster
+        //double steerAngle = ui->lineEditWheelDec->text().toDouble();
+        //double gas = ui->lineEditGas->text().toDouble();
+
+        //Create Json Dictionaries
+        QJsonObject eventData;
+        eventData.insert("steering_angle", QJsonValue::fromVariant(steerValueConverted));
+        eventData.insert("throttle", QJsonValue::fromVariant(throttleValueConverted));
+        //eventData.insert("");
+
+        QJsonObject data;
+        //event.insert("name", "steer");
+        data.insert("data", eventData);
+        QJsonObject event;
+        event.insert("name", "steer");
+
+        QJsonDocument doc(data);//Send name
+        QJsonDocument doc2(event);
+        //client->sendTextMessage("42" + doc.toJson(QJsonDocument::Compact));//Send data
+        //client->sendTextMessage("42{\"data\":{\"steering_angle\":0,\"throttle\":0},\"name\":\"steer\"}");
+        client->sendTextMessage("42" + doc2.toJson(QJsonDocument::Compact) + doc.toJson(QJsonDocument::Compact));
+        //client->sendTextMessage("42" + event);//Send data
+
+    }
+}
+
+void DeviceTester::onNewConnection()
+{
+    ui->textBrowser->append("Client connected.");
+    client = webSocketServer->nextPendingConnection();
 }
 
 void DeviceTester::showMessageFromThread(QString message){
     ui->textBrowser->append(message);
 }
+
+void DeviceTester::sendWheelButtonsPacket(){ // from byte 12 listing
+    bool ok = false;
+    short wheelButtonValue = ui->lineEditWheelByte12->text().toShort(&ok, 2);
+    QString str;
+    QByteArray packet;
+    switch (wheelButtonValue){
+    case 8:  // purple button
+        str = "<message><action name=\"keyPress\">KEY_END</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    default:
+        break;
+    }
+}
+
+void DeviceTester::sendGearPacket(){
+    bool ok = false;
+    short shifterValue = ui->lineEditShiftByte2->text().toShort(&ok,2); // read Byte 2 as a binary value
+    QString str;
+    QByteArray packet;
+    switch (shifterValue){
+    case 0:  // neutral
+        str = "<message><action name=\"keyPress\">NEUTRAL</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 1:  // 1st gear
+        str = "<message><action name=\"keyPress\">BUTTON_8</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 2:  // 2nd gear
+        str = "<message><action name=\"keyPress\">BUTTON_9</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 4:  // 3rd gear
+        str = "<message><action name=\"keyPress\">BUTTON_10</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 8:  // 4th gear
+        str = "<message><action name=\"keyPress\">BUTTON_11</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 16:  // 5th gear
+        str = "<message><action name=\"keyPress\">BUTTON_12</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 32:  // 6th gear
+        str = "<message><action name=\"keyPress\">BUTTON_13</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    case 128:  // Reverse gear
+        str = "<message><action name=\"keyPress\">BUTTON_14</action></message>";
+        ui->textBrowser->append("XML Message sent: "+ str);
+        packet.append(str);
+        packetSender(packet);
+        break;
+    default:
+        break;
+    }
+}
+
 
 void DeviceTester::sendDPadPacket(){
     bool ok = false;

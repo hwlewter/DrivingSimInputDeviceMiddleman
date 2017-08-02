@@ -14,6 +14,18 @@
 #include "tcpserverthread.h"
 #include <QThread>
 
+#include <stdint.h> //<- uint8_t does not name a type
+#include <QMap>
+#include <QList>
+#include <QJsonObject>
+#include <QJsonDocument>
+
+#include <QLineEdit>
+#include <QtWebSockets/QWebSocket>
+#include <QWebSocketServer>
+#include <QSlider>
+#include <QLabel>
+
 namespace Ui {
 class DeviceTester;
 }
@@ -39,6 +51,7 @@ public:
     QTcpServer *tcpServer;
     TCPServerThread *serverThread;
     QThread *thread;
+
     void delay();
 
 private:
@@ -52,6 +65,10 @@ private:
     double brakeEffectiveness;
     double inputDelay;
 
+    QLineEdit* lineEdit, lineEdit2;
+    QWebSocketServer* webSocketServer;
+    QWebSocket* client;
+
 private slots:
     void getClassInformation();
     void updateText();
@@ -61,6 +78,8 @@ private slots:
     void sendCanbusPacketBrake();
     void sendCanbusPacketClutch();
     void sendDPadPacket();
+    void sendGearPacket();
+    void sendWheelButtonsPacket();
     void steeringEffectivenessUpdate();
     void brakeEffectivenessUpdate();
     void packetSender(QByteArray packet);
@@ -69,6 +88,7 @@ private slots:
     void socketProvided();  // from signal letting us know a socket was created by TCP Server
     void updateFaults(QString message); // process message from remote app to update faults
     void sendJSONPacket();
+    void onNewConnection();//WebSocket Connection
 };
 
 #endif // DEVICETESTER_H
